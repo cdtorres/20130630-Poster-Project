@@ -143,3 +143,20 @@ simulatetrials <- function(theta_a, theta_b, prior, B, delta, second_parameter =
   cat("Columns renamed.\n")
   return(x)
 }
+
+simsum <- function(x)
+{
+  est_placebo =   mean(x[,1])#average estimated placebo effect
+  est_treatment = mean(x[,2])#average estimated treatment effect
+  n_efficacy =    sum( x[,3])#number of trials that ended with perceived efficacy
+  n_futility =    sum( x[,4])#number of trials that ended with perceived futility
+  n_early =       sum( x[,5])#number of trials that stopped early
+  avg_patients =  mean(x[,6])#average number of patients per trial
+  mean_p =        mean(x[,7])#mean P(theta_a < theta_b | data)
+  
+  thesummary = data.frame(rbind(c(est_placebo, est_treatment, n_efficacy, n_futility, n_early,
+                                  avg_patients, mean_p)))
+  colnames(thesummary) = c("est_placebo", "est_treatment", "n_efficacy", "n_futility", "n_early",
+                           "avg_patients", "mean_p")
+  return(thesummary)
+}
