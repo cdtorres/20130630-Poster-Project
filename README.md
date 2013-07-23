@@ -4,7 +4,9 @@
 Simulations of clinical trials using certain Bayesian adaptive methods
 
 simulatetrials.R defines two functions:
+
 clinicaltrial() simulates a single clinical trial
+
 simulatetrials() calls clinicaltrial() multiple times, returning a data frame
 
 these functions require packages 'multicore' and 'pracma'
