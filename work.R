@@ -1,20 +1,15 @@
 #simulatetrials(theta_a = .2, theta_b = .2, prior = .2, B = 1000, how_often = 1, delta = .2)
-#took almost 12 minutes. 946/1000 trials stopped early.
+#took 12 minutes 22 seconds. 946/1000 trials stopped early.
 
-set.seed(619)
-a = Sys.time()
-x = simulatetrials(theta_a = .2, theta_b = .2, prior = .2, B = 10, how_often = 1, delta = .2)
-b = Sys.time()
-b - a
-#dat = as.data.frame(matrix(unlist(x), ncol=7, byrow=TRUE))
-#colnames(dat) = c("placebo", "treatment", "efficacy", "futility", "early", "n", "probability")
-mean(x[,1])#average estimated placebo effect
-mean(x[,2])#average estimated treatment effect
-sum( x[,3])#number of trials that ended with perceived efficacy
-sum( x[,4])#number of trials that ended with perceived futility
-sum( x[,5])#number of trials that stopped early
-mean(x[,6])#average number of patients per trial
-mean(x[,7])#mean P(theta_a < theta_b | data)
+B = 1000
+how_often = 1
+set.seed(619)#for the purposes of replication
+a = Sys.time()#to time my code
+x = simulatetrials(theta_a = .2, theta_b = .2, prior = .2, B = B, how_often = how_often, delta = .2)
+b = Sys.time()#to time my code
+b - a#amount of time my code took to run
 
-dim(unique(as.matrix(x)))[1]
-table(x[,6])
+
+dim(unique(as.matrix(x)))[1]#number of unique simulations
+table(x[,6])#table of the number of patients used in the clinical trials
+simsum(x)
