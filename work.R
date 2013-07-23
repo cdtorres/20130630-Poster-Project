@@ -3,7 +3,7 @@
 
 set.seed(619)
 a = Sys.time()
-x = simulatetrials(theta_a = .2, theta_b = .2, prior = .2, B = 500, how_often = 1)
+x = simulatetrials(theta_a = .2, theta_b = .2, prior = .2, B = 20, how_often = 1, delta = .4)
 b = Sys.time()
 b - a
 #dat = as.data.frame(matrix(unlist(x), ncol=7, byrow=TRUE))

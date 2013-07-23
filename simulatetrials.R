@@ -6,7 +6,7 @@
 #integral_tolerance is for the two-dimensional integral when evalualing P(theta_a < theta_b | data)
 #making integral_tolerance small greatly increases the time that a simulation takes to run
 clinicaltrial <-function(seed, theta_a, theta_b, prior, second_parameter, N, efficacy_threshold,
-                         futility_threshold, integral_tolerance, how_often)
+                         futility_threshold, integral_tolerance, how_often, delta)
 {
   #require(cubature)
   require(pracma)
@@ -38,6 +38,7 @@ clinicaltrial <-function(seed, theta_a, theta_b, prior, second_parameter, N, eff
   p_a = 1/2
   #p_b = 1 - p_a
   
+  set.seed(seed)
   #simulate the random assignments
   assigned_to_a = rbinom(1, 10, p_a)
   assigned_to_b = 10 - assigned_to_a
@@ -67,7 +68,7 @@ clinicaltrial <-function(seed, theta_a, theta_b, prior, second_parameter, N, eff
   #integrand = function(x)
   #  (1/beta(a_1, a_2))*(1/beta(b_1, b_2))*x[1]^(a_1 - 1)*(1 - x[1])^(a_2 - 1)*x[2]^(b_1 - 1)*(1 - x[2])^(b_2 - 1)*(x[1] < x[2])
   integrand = function(x, y)
-    (1/beta(a_1, a_2))*(1/beta(b_1, b_2))*x^(a_1 - 1)*(1 - x)^(a_2 - 1)*y^(b_1 - 1)*(1 - y)^(b_2 - 1)*(x < y)
+    (1/beta(a_1, a_2))*(1/beta(b_1, b_2))*x^(a_1 - 1)*(1 - x)^(a_2 - 1)*y^(b_1 - 1)*(1 - y)^(b_2 - 1)*(x + delta < y)
   
   #a_less_than_b = adaptIntegrate(integrand, c(0, 0), c(1, 1), tol = integral_tolerance)
   a_less_than_b = dblquad(integrand, 0, 1, 0, 1, tol = integral_tolerance)
@@ -77,7 +78,6 @@ clinicaltrial <-function(seed, theta_a, theta_b, prior, second_parameter, N, eff
   efficacious = (a_less_than_b > efficacy_threshold)
   futile      = (a_less_than_b < futility_threshold)
   
-  set.seed(seed)
   while(n < N & !efficacious & !futile)
   {
     #simulate the random assignments
@@ -109,7 +109,7 @@ clinicaltrial <-function(seed, theta_a, theta_b, prior, second_parameter, N, eff
     #integrand = function(x)
     #  (1/beta(a_1, a_2))*(1/beta(b_1, b_2))*x[1]^(a_1 - 1)*(1 - x[1])^(a_2 - 1)*x[2]^(b_1 - 1)*(1 - x[2])^(b_2 - 1)*(x[1] < x[2])
     integrand = function(x, y)
-      (1/beta(a_1, a_2))*(1/beta(b_1, b_2))*x^(a_1 - 1)*(1 - x)^(a_2 - 1)*y^(b_1 - 1)*(1 - y)^(b_2 - 1)*(x < y)
+      (1/beta(a_1, a_2))*(1/beta(b_1, b_2))*x^(a_1 - 1)*(1 - x)^(a_2 - 1)*y^(b_1 - 1)*(1 - y)^(b_2 - 1)*(x + delta < y)
     
     #a_less_than_b = adaptIntegrate(integrand, c(0, 0), c(1, 1), tol = integral_tolerance)
     a_less_than_b = dblquad(integrand, 0, 1, 0, 1, tol = integral_tolerance)
@@ -127,15 +127,19 @@ clinicaltrial <-function(seed, theta_a, theta_b, prior, second_parameter, N, eff
 
 
 
-simulatetrials <- function(theta_a, theta_b, prior, B, second_parameter = 5, N = 100,
+simulatetrials <- function(theta_a, theta_b, prior, B, delta, second_parameter = 5, N = 100,
                            efficacy_threshold = 0.95, futility_threshold = 0.05,
                            integral_tolerance = 1e-5, how_often = 5)
 {
   require(multicore)
   seeds = sample(1:(B*10), B)
+  cat("The seed is set.\n")
   dat = mclapply(seeds, clinicaltrial, theta_a, theta_b, prior, second_parameter, N, efficacy_threshold,
-                 futility_threshold, integral_tolerance, how_often, mc.cores = 4)
+                 futility_threshold, integral_tolerance, how_often, delta, mc.cores = 3)
+  cat("mclapply successfully excecuted.\n")
   x = as.data.frame(matrix(unlist(dat), ncol=7, byrow=TRUE))
+  cat("Data frame created.\n")
   colnames(x) = c("placebo", "treatment", "efficacy", "futility", "early", "n", "probability")
+  cat("Columns renamed.\n")
   return(x)
 }
