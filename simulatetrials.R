@@ -120,7 +120,7 @@ simulatetrials <- function(theta_a, theta_b, prior, B, delta, second_parameter =
 # the number of patients before next evaluation, and old values
 update.evaluate <- function(theta_a, theta_b, delta, integral_tolerance, how_many, ov)
 {
-  require(pracma)#required for dblquad()
+  #require(pracma)#required for dblquad()
   nv = rep(NA, length(ov))#the updated values that will be returned by this function (new values)
   
   #simulate the random assignments
@@ -149,10 +149,17 @@ update.evaluate <- function(theta_a, theta_b, delta, integral_tolerance, how_man
   #integrand is joint density for theta_a and theta_b, defined on theta_a + delta < theta_b
   #theta_a is denoted as x, while theta_b is denoted as y
   
-  integrand = function(x, y)
-    (1/beta(nv[3], nv[4]))*(1/beta(nv[5], nv[6]))*x^(nv[3] - 1)*(1 - x)^(nv[4] - 1)*y^(nv[5] - 1)*(1 - y)^(nv[6] - 1)*(x + delta < y)
+  #integrand = function(x, y)
+  #  (1/beta(nv[3], nv[4]))*(1/beta(nv[5], nv[6]))*x^(nv[3] - 1)*(1 - x)^(nv[4] - 1)*y^(nv[5] - 1)*(1 - y)^(nv[6] - 1)*(x + delta < y)
   
-  nv[7] = dblquad(integrand, 0, 1, 0, 1, tol = integral_tolerance)
+  #nv[7] = dblquad(integrand, 0, 1, 0, 1, tol = integral_tolerance)
+  
+  integrand = function(y)
+  {
+    pbeta((y - delta), nv[3], nv[4])*dbeta(y, nv[5], nv[6])
+  }
+  
+  nv[7] = integrate(integrand, 0, 1)$value
   
   return(nv)
 }
