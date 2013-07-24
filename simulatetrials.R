@@ -59,7 +59,10 @@ clinicaltrial <-function(seed, theta_a, theta_b, prior, second_parameter, N, eff
 
   #treat 10 patients before updating the randomization probability
   #or evaluating P(theta_a + delta < theta_b | data)
-  v = update.evaluate(theta_a, theta_b, delta, integral_tolerance, how_many = 10, ov = v)
+  if(10 <= N)
+    v = update.evaluate(theta_a, theta_b, delta, integral_tolerance, how_many = 10, ov = v)
+  else#you can't treat more than the maximum amount of patients!
+    v = update.evaluate(theta_a, theta_b, delta, integral_tolerance, how_many = N, ov = v)
   
   #remember, v[7] is P(theta_a + delta < theta_b | data)
   efficacious = (v[7] > efficacy_threshold)
@@ -68,7 +71,10 @@ clinicaltrial <-function(seed, theta_a, theta_b, prior, second_parameter, N, eff
   #loop while we haven't treated all patients and while we haven't established efficacy/futility
   while(v[1] < N & !efficacious & !futile)
   {    
-    v = update.evaluate(theta_a, theta_b, delta, integral_tolerance, how_many = how_often, ov = v)
+    if(v[1] + how_often <= N)
+      v = update.evaluate(theta_a, theta_b, delta, integral_tolerance, how_many = how_often, ov = v)
+    else#you can't treat more than the maximum amount of patients!
+      v = update.evaluate(theta_a, theta_b, delta, integral_tolerance, how_many = (N - v[1]), ov = v)
     
     efficacious = (v[7] > efficacy_threshold)
     futile      = (v[7] < futility_threshold)
