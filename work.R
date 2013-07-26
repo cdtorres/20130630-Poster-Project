@@ -1,8 +1,8 @@
 # true arm effects
 theta_a = 0.2
-theta_b = 0.2
-var_a   = 1
-var_b   = 1
+theta_b = 1.1
+var_a   = .5
+var_b   = .5
 type = 'continuous'
 ##################################################################
 # note: the Beta distribution with mean 0.5 and second parameter 1
@@ -19,7 +19,7 @@ if(type != 'continuous')
 }
 ##################################################################
 # number of simulations
-B = 40
+B = 10000
 # after the initial 10 patients, how often do we want to update the posterior distributions?
 how_often = 1
 delta = 1
@@ -34,6 +34,6 @@ b = Sys.time()#to time my code
 b - a#amount of time my code took to run
 
 
-#dim(unique(as.matrix(x)))[1]#number of unique simulations
-#table(x[,6])#table of the number of patients used in the clinical trials
-#simsum(x)
+dim(unique(as.matrix(x)))[1]#number of unique simulations
+table(x[,6])#table of the number of patients used in the clinical trials
+simsum(x)

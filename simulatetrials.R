@@ -72,6 +72,7 @@ clinicaltrial <-function(seed, theta_a, theta_b, var_a, var_b, prior, second_par
 
   #treat 10 patients before updating the randomization probability
   #or evaluating P(theta_a + delta < theta_b | data)
+  v_global <<- v
   if(10 <= N)
     v = update.evaluate(theta_a = theta_a, theta_b = theta_b, var_a = var_a, var_b = var_b, delta = delta,
                         integral_tolerance = integral_tolerance, how_many = 10, ov = v, type = type)
@@ -86,6 +87,7 @@ clinicaltrial <-function(seed, theta_a, theta_b, var_a, var_b, prior, second_par
   #loop while we haven't treated all patients and while we haven't established efficacy/futility
   while(v[1] < N & !efficacious & !futile)
   {    
+    v_global <<- v
     if(v[1] + how_often <= N)
       v = update.evaluate(theta_a = theta_a, theta_b = theta_b, var_a = var_a, var_b = var_b,
                           delta = delta, integral_tolerance = integral_tolerance, how_many = how_often,
@@ -157,6 +159,7 @@ update.evaluate <- function(theta_a, theta_b, var_a, var_b, delta, integral_tole
   
   #simulate the random assignments (this is the same regardless of outcome type)
   assigned_to_a = rbinom(1, how_many, ov[2])
+  assigned_to_a_global <<- assigned_to_a
   assigned_to_b = how_many - assigned_to_a
   nv[1] = ov[1] + how_many
   
@@ -183,10 +186,10 @@ update.evaluate <- function(theta_a, theta_b, var_a, var_b, delta, integral_tole
   else if(type == 'continuous')
   {
     #update parameters m_a, v_a, m_b, v_b
-    nv[3] = (ov[3]/ov[4] + sum_a/var_a) / (1/ov[4] + assigned_to_a/var_a)
     nv[4] = (1/ov[4] + assigned_to_a/var_a)^-1
-    nv[5] = (ov[5]/ov[6] + sum_b/var_b) / (1/ov[6] + assigned_to_b/var_b)
+    nv[3] = (ov[3]/ov[4] + sum_a/var_a)*nv[4]
     nv[6] = (1/ov[6] + assigned_to_b/var_b)^-1
+    nv[5] = (ov[5]/ov[6] + sum_b/var_b)*nv[6]
   }
   
   if(type == 'binary')
@@ -240,18 +243,22 @@ update.evaluate <- function(theta_a, theta_b, var_a, var_b, delta, integral_tole
     nv[2] = theta_a_hat/(theta_a_hat + theta_b_hat)
   else if(type == 'continuous')
   {
-#     #going off of page 156
-#     r_integrand = function(y)#randomization integrand
-#     {
-#       pnorm(y, nv[3], nv[4])*dnorm(y, nv[5], nv[6])
-#     }
-#     r_integral = integrate(r_integrand, -Inf, Inf)$value#randomization integral
+     #going off of page 156
+     r_integrand = function(y)#randomization integrand
+     {
+       #pnorm(y, nv[3], nv[4])*dnorm(y, nv[5], nv[6])
+       dnorm(y, nv[5], nv[6])
+     }
+     r_integral = integrate(r_integrand, -Inf, Inf)$value#randomization integral
+#     r_integral = min(1, r_integral)
 #     c = nv[1]/(2*100)
 #     r_1 = (1 - r_integral)^c
 #     r_2 = (r_integral)^c
 #     nv[2] = r_1/(r_1 + r_2)
 #     global_probability <<- r_integral
-    nv[2] = .2
+     nv[2] = 1 - r_integral
+     if(nv[2] < 0)
+       nv[2] = 0
   }
   return(nv)
 }
