@@ -1,8 +1,8 @@
 # true arm effects
 theta_a = 0.2
 theta_b = 1.1
-var_a   = .5
-var_b   = .5
+var_a   = .25
+var_b   = .25
 type = 'continuous'
 ##################################################################
 # note: the Beta distribution with mean 0.5 and second parameter 1

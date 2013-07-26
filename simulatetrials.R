@@ -250,15 +250,15 @@ update.evaluate <- function(theta_a, theta_b, var_a, var_b, delta, integral_tole
        dnorm(y, nv[5], nv[6])
      }
      r_integral = integrate(r_integrand, -Inf, Inf)$value#randomization integral
-#     r_integral = min(1, r_integral)
-#     c = nv[1]/(2*100)
-#     r_1 = (1 - r_integral)^c
-#     r_2 = (r_integral)^c
-#     nv[2] = r_1/(r_1 + r_2)
-#     global_probability <<- r_integral
-     nv[2] = 1 - r_integral
-     if(nv[2] < 0)
-       nv[2] = 0
+    r_integral = min(1, r_integral)
+    c = nv[1]/(2*100)
+    r_1 = (1 - r_integral)^c
+    r_2 = (r_integral)^c
+    nv[2] = r_1/(r_1 + r_2)
+#    global_probability <<- r_integral
+#     nv[2] = 1 - r_integral
+#     if(nv[2] < 0)
+#       nv[2] = 0
   }
   return(nv)
 }
