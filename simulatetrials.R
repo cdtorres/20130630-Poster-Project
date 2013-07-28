@@ -235,7 +235,11 @@ update.evaluate <- function(theta_a, theta_b, var_a, var_b, delta, integral_tole
   }
   else if(type == 'continuous')
   {
-    nv[7] = integrate(integrand, -Inf, Inf)$value
+    #We're calculating P(X + delta < Y | data) here. By defining W = X - Y and standardizing this new
+    #variable, and call it Z, we can find the probability of P(Z < z | data) instead, using the z defined
+    #below
+    z = (nv[5] - nv[3] - delta)/sqrt(nv[4] + nv[6])
+    nv[7] = pnorm(z)
   }
   
   #update the probability of being assigned to treatment group a (the control group)
@@ -243,14 +247,12 @@ update.evaluate <- function(theta_a, theta_b, var_a, var_b, delta, integral_tole
     nv[2] = theta_a_hat/(theta_a_hat + theta_b_hat)
   else if(type == 'continuous')
   {
-     #going off of page 156
-     r_integrand = function(y)#randomization integrand
-     {
-       #pnorm(y, nv[3], nv[4])*dnorm(y, nv[5], nv[6])
-       dnorm(y, nv[5], nv[6])
-     }
-     r_integral = integrate(r_integrand, -Inf, Inf)$value#randomization integral
-    r_integral = min(1, r_integral)
+    
+    #going off of page 156
+    #We're calculating P(X < Y | data) here. By defining W = X - Y and standardizing this new variable,
+    #and call it Z, we can find the probability of P(Z < r_z | data) instead, using the r_z defined below
+    r_z = (nv[5] - nv[3])/sqrt(nv[4] + nv[6])
+    r_integral = pnorm(r_z)
     c = nv[1]/(2*100)
     r_1 = (1 - r_integral)^c
     r_2 = (r_integral)^c
