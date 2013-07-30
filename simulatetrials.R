@@ -290,13 +290,13 @@ simsum <- function(x)
 # patients per trial, starting efficacy and futility thresholds, integral tolerance (for binary data),
 # how often to update the posterior and randomization probabilities (in terms of number of patients),
 # number of cores to use when running this function, number of patients in each trial before starting to
-# adapt, desired errors, max outer while loops, and the increment with which to change the efficacy and
-# futility thresholds before reevaluating the errors.
+# adapt, desired errors, max outer while loops, and an indicator as to whether report the results after
+# each loop.
 get.thresholds <- function(theta_a, theta_b, var_a = NULL, var_b = NULL, prior, B, delta, type,
                            second_parameter = 5, N = 100, efficacy_threshold = 1,
                            futility_threshold = 0, integral_tolerance = 1e-5, how_often = 5, cores = 3,
                            initial = 10, desired_type_1_error = 0.05, desired_type_2_error = 0.05,
-                           maxloops = 5, increment = 0.01, report = F)
+                           maxloops = 5, report = F)
 {
   type_1_error = 1#initial type 1 error
   type_2_error = 1#initial type 2 error
@@ -315,6 +315,8 @@ get.thresholds <- function(theta_a, theta_b, var_a = NULL, var_b = NULL, prior, 
   while((type_1_error > desired_type_1_error | type_2_error > desired_type_2_error |
            something_changed == T) & loops < maxloops)
   {
+    #The increment is 0.1 for the first loop, 0.01 for the second loop, 0.001 for the third loop, ...
+    increment = 10^(-(loops + 1))
     something_changed = F
     #Get the type 1 error, by simulating under the null hypothesis.
     x = simulatetrials(theta_a = theta_a, theta_b = theta_a, var_a = var_a, var_b = var_b,
@@ -451,6 +453,10 @@ get.thresholds <- function(theta_a, theta_b, var_a = NULL, var_b = NULL, prior, 
       cat("type 2 error: ")
       cat(type_2_error, ".\n")
     }
+    
+    #I want the while loop to get at least to increments of 0.01, and I force it in this manner.
+    if(loops == 0)
+      something_changed = T
     
     loops = loops + 1
   }
