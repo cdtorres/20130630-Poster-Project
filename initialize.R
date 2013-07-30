@@ -18,31 +18,16 @@ if(type != 'continuous')
 {
   # true arm effects
   theta_a = 0.2
-  theta_b = 0.2
+  theta_b = 0.6
   var_a   = NA
   var_b   = NA
   
   prior = 0.5
   second_parameter = 1
-  delta = .2
+  delta = .4
 }
 ##################################################################
 # number of simulations
 B = 10000
 # after the initial 10 patients, how often do we want to update the posterior distributions?
 how_often = 1
-
-
-
-a = Sys.time()#to time my code
-set.seed(619)#for the purposes of replication
-x = simulatetrials(theta_a = theta_a, theta_b = theta_b, var_a = var_a, var_b = var_b, prior = prior,
-                   second_parameter = second_parameter, B = B, how_often = how_often, delta = delta,
-                   type = type)
-b = Sys.time()#to time my code
-b - a#amount of time my code took to run
-
-
-#dim(unique(as.matrix(x)))[1]#number of unique simulations
-#table(x[,6])#table of the number of patients used in the clinical trials
-simsum(x)

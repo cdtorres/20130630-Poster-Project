@@ -17,7 +17,7 @@
 # after the initial 10 patients and initial evaluation
 clinicaltrial <-function(seed, theta_a, theta_b, var_a, var_b, prior, second_parameter, N,
                          efficacy_threshold, futility_threshold, integral_tolerance, how_often, delta,
-                         type)
+                         type, initial)
 {
   if(type == 'binary')
   {
@@ -72,13 +72,13 @@ clinicaltrial <-function(seed, theta_a, theta_b, var_a, var_b, prior, second_par
 
   #treat 10 patients before updating the randomization probability
   #or evaluating P(theta_a + delta < theta_b | data)
-  v_global <<- v
-  if(10 <= N)
+  if(initial <= N)
     v = update.evaluate(theta_a = theta_a, theta_b = theta_b, var_a = var_a, var_b = var_b, delta = delta,
-                        integral_tolerance = integral_tolerance, how_many = 10, ov = v, type = type)
+                        integral_tolerance = integral_tolerance, how_many = initial, ov = v, type = type,
+                        N = N)
   else#you can't treat more than the maximum amount of patients!
     v = update.evaluate(theta_a = theta_a, theta_b = theta_b, var_a = var_a, var_b = var_b, delta = delta,
-                        integral_tolerance = integral_tolerance, how_many = N, ov = v, type = type)
+                        integral_tolerance = integral_tolerance, how_many = N, ov = v, type = type, N = N)
   
   #remember, v[7] is P(theta_a + delta < theta_b | data)
   efficacious = (v[7] > efficacy_threshold)
@@ -87,15 +87,14 @@ clinicaltrial <-function(seed, theta_a, theta_b, var_a, var_b, prior, second_par
   #loop while we haven't treated all patients and while we haven't established efficacy/futility
   while(v[1] < N & !efficacious & !futile)
   {    
-    v_global <<- v
     if(v[1] + how_often <= N)
       v = update.evaluate(theta_a = theta_a, theta_b = theta_b, var_a = var_a, var_b = var_b,
                           delta = delta, integral_tolerance = integral_tolerance, how_many = how_often,
-                          ov = v, type = type)
+                          ov = v, type = type, N = N)
     else#you can't treat more than the maximum amount of patients!
       v = update.evaluate(theta_a = theta_a, theta_b = theta_b, var_a = var_a, var_b = var_b,
                           delta = delta, integral_tolerance = integral_tolerance, how_many = (N - v[1]),
-                          ov = v, type = type)
+                          ov = v, type = type, N = N)
     
     efficacious = (v[7] > efficacy_threshold)
     futile      = (v[7] < futility_threshold)
@@ -118,32 +117,34 @@ clinicaltrial <-function(seed, theta_a, theta_b, var_a, var_b, prior, second_par
 # For now, I use only 3 cores because my laptop isn't _that_ powerful.
 simulatetrials <- function(theta_a, theta_b, var_a = NULL, var_b = NULL, prior, B, delta, type,
                            second_parameter = 5, N = 100, efficacy_threshold = 0.95,
-                           futility_threshold = 0.05, integral_tolerance = 1e-5, how_often = 5, cores = 3)
+                           futility_threshold = 0.05, integral_tolerance = 1e-5, how_often = 5, cores = 3,
+                           gseed = 619, initial = 10)
 {
+  set.seed(gseed)
   if(!(type %in% c('binary', 'continuous')))
     stop("Please put in 'binary' or 'continuous' for the variable 'type'.")
   require(multicore)#required for mclapply()
   seeds = sample(1:(B*10), B)#for the purposes of replication
-  cat("The seed is set.\n")
+  #cat("The seed is set.\n")
   #apply the clinicaltrial() function to 'seeds', passing in all the other necessary variables
   if(type == 'binary')
   {
     dat = mclapply(seeds, clinicaltrial, theta_a, theta_b, NULL, NULL, prior, second_parameter, N,
                    efficacy_threshold, futility_threshold, integral_tolerance, how_often, delta, type,
-                   mc.cores = cores)
+                   initial, mc.cores = cores)
   }
   else if (type == 'continuous')
   {
     dat = mclapply(seeds, clinicaltrial, theta_a, theta_b, var_a, var_b, prior, second_parameter, N,
                    efficacy_threshold, futility_threshold, integral_tolerance, how_often, delta, type,
-                   mc.cores = cores)
+                   initial, mc.cores = cores)
   }
-  cat("mclapply successfully excecuted.\n")
+  #cat("mclapply successfully excecuted.\n")
   #format the data into something I am more comfortable with
   x = as.data.frame(matrix(unlist(dat), ncol=7, byrow=TRUE))
-  cat("Data frame created.\n")
+  #cat("Data frame created.\n")
   colnames(x) = c("placebo", "treatment", "efficacy", "futility", "early", "n", "probability")
-  cat("Columns renamed.\n")
+  #cat("Columns renamed.\n")
   return(x)
 }
 
@@ -152,14 +153,13 @@ simulatetrials <- function(theta_a, theta_b, var_a = NULL, var_b = NULL, prior, 
 # pass in the true theta_a and theta_b, delta, integral tolerance,
 # the number of patients before next evaluation, and old values
 update.evaluate <- function(theta_a, theta_b, var_a, var_b, delta, integral_tolerance,
-                            how_many, ov, type)
+                            how_many, ov, type, N)
 {
   #require(pracma)#required for dblquad()
   nv = rep(NA, length(ov))#the updated values that will be returned by this function (new values)
   
   #simulate the random assignments (this is the same regardless of outcome type)
   assigned_to_a = rbinom(1, how_many, ov[2])
-  assigned_to_a_global <<- assigned_to_a
   assigned_to_b = how_many - assigned_to_a
   nv[1] = ov[1] + how_many
   
@@ -236,8 +236,8 @@ update.evaluate <- function(theta_a, theta_b, var_a, var_b, delta, integral_tole
   else if(type == 'continuous')
   {
     #We're calculating P(X + delta < Y | data) here. By defining W = X - Y and standardizing this new
-    #variable, and call it Z, we can find the probability of P(Z < z | data) instead, using the z defined
-    #below
+    #variable, and calling it Z, we can find the probability of P(Z < z | data) instead, using the z
+    #defined below
     z = (nv[5] - nv[3] - delta)/sqrt(nv[4] + nv[6])
     nv[7] = pnorm(z)
   }
@@ -253,14 +253,10 @@ update.evaluate <- function(theta_a, theta_b, var_a, var_b, delta, integral_tole
     #and call it Z, we can find the probability of P(Z < r_z | data) instead, using the r_z defined below
     r_z = (nv[5] - nv[3])/sqrt(nv[4] + nv[6])
     r_integral = pnorm(r_z)
-    c = nv[1]/(2*100)
+    c = nv[1]/(2*N)
     r_1 = (1 - r_integral)^c
     r_2 = (r_integral)^c
     nv[2] = r_1/(r_1 + r_2)
-#    global_probability <<- r_integral
-#     nv[2] = 1 - r_integral
-#     if(nv[2] < 0)
-#       nv[2] = 0
   }
   return(nv)
 }
@@ -282,3 +278,213 @@ simsum <- function(x)
                            "avg_patients", "mean_p")
   return(thesummary)
 }
+
+
+
+
+
+
+
+# Pass in the true theta_a and theta_b (also var_a and var_b if continuous), prior, number of simulations
+# per evaluation, delta, type of data, second parameter for the prior information, maximum number of
+# patients per trial, starting efficacy and futility thresholds, integral tolerance (for binary data),
+# how often to update the posterior and randomization probabilities (in terms of number of patients),
+# number of cores to use when running this function, number of patients in each trial before starting to
+# adapt, desired errors, max outer while loops, and the increment with which to change the efficacy and
+# futility thresholds before reevaluating the errors.
+get.thresholds <- function(theta_a, theta_b, var_a = NULL, var_b = NULL, prior, B, delta, type,
+                           second_parameter = 5, N = 100, efficacy_threshold = 1,
+                           futility_threshold = 0, integral_tolerance = 1e-5, how_often = 5, cores = 3,
+                           initial = 10, desired_type_1_error = 0.05, desired_type_2_error = 0.05,
+                           maxloops = 5, increment = 0.01, report = F)
+{
+  type_1_error = 1#initial type 1 error
+  type_2_error = 1#initial type 2 error
+  
+  #This is an indicator for whether something changed in the previous outer loop. If it is set to true,
+  #then it goes through the outer loop one more time to make sure that everything has "settled" and/or
+  #"converged".
+  something_changed = T
+  loops = 0#number of loops
+  
+  #As long as the type_1 or type_2 error isn't where we want it to be, or if something changed in the
+  #last loop, we want to loop through again. However, on the off-chance that this condition is always
+  #true for some reason, we don't want it to loop forever, so we set a maximum number of loops. If when
+  #the function finishes evaluating, it took the maximum number of loops to finish, we may want to
+  #investigate more as to why this happened.
+  while((type_1_error > desired_type_1_error | type_2_error > desired_type_2_error |
+           something_changed == T) & loops < maxloops)
+  {
+    something_changed = F
+    #Get the type 1 error, by simulating under the null hypothesis.
+    x = simulatetrials(theta_a = theta_a, theta_b = theta_a, var_a = var_a, var_b = var_b,
+                       prior = prior, second_parameter = second_parameter, B = B,
+                       how_often = how_often, delta = delta, type = type,
+                       efficacy_threshold = efficacy_threshold,
+                       futility_threshold = futility_threshold, initial = initial)
+    type_1_error = as.numeric(simsum(x)[3]/B)#initial type 1 error
+    if(type_1_error > desired_type_1_error)
+    {
+      #If the type 1 error is too high, we increase the efficacy threshold until the type 1 error is
+      #low enough. But we can't let the efficacy threshold be more than 1, because that makes no sense!
+      while(type_1_error > desired_type_1_error & efficacy_threshold <= 1)
+      {
+        efficacy_threshold = efficacy_threshold + increment
+        x = simulatetrials(theta_a = theta_a, theta_b = theta_a, var_a = var_a, var_b = var_b,
+                           prior = prior, second_parameter = second_parameter, B = B,
+                           how_often = how_often, delta = delta, type = type,
+                           efficacy_threshold = efficacy_threshold,
+                           futility_threshold = futility_threshold, initial = initial)
+        type_1_error = as.numeric(simsum(x)[3]/B)
+        something_changed = T#indicate that there was a change
+      }
+    }
+    else
+    {
+      #If the type 1 error is already at an acceptable level, we check to see if we can decrease the
+      #efficacy threshold while still maintaining an acceptable type 1 error.
+      
+      #This flag is to indicate that we successfully decreased the efficacy threshold while maintaing
+      #an acceptable type 1 error. If we were successful, we want to loop through and check one more
+      #time. If we weren't successful, the flag will remain at F, and we will stop looping through
+      #because we found the lowest efficacy threshold such that the type 1 error is still at an
+      #acceptable level.
+      something_changed_2 = T
+      while(type_1_error < desired_type_1_error & efficacy_threshold >= 0 & something_changed_2 == T)
+      {
+        something_changed_2 = F
+        
+        #We store our results in some temporary variables.
+        potential_efficacy_threshold = efficacy_threshold - increment
+        potential_x = simulatetrials(theta_a = theta_a, theta_b = theta_a, var_a = var_a, var_b = var_b,
+                                     prior = prior, second_parameter = second_parameter, B = B,
+                                     how_often = how_often, delta = delta, type = type,
+                                     efficacy_threshold = potential_efficacy_threshold,
+                                     futility_threshold = futility_threshold, initial = initial)
+        potential_type_1_error = as.numeric(simsum(potential_x)[3]/B)
+        #This is where we check if the type 1 error is still at an acceptable level.
+        #If we so, we overwrite our regular variables with the temporary ones, and indicate that we need
+        #to loop through at least once more, for both the inner and outer while loops.
+        if(potential_type_1_error <= desired_type_1_error & potential_efficacy_threshold <= 1)
+        {
+          x = potential_x
+          efficacy_threshold = potential_efficacy_threshold
+          type_1_error = potential_type_1_error
+          something_changed   = T
+          something_changed_2 = T
+        }
+      }
+    }
+    
+    #Now we are going to work with the type 2 error
+    #Get type 2 error, by simulating under the alternative hypothesis
+    
+    x = simulatetrials(theta_a = theta_a, theta_b = theta_b, var_a = var_a, var_b = var_b,
+                       prior = prior, second_parameter = second_parameter, B = B,
+                       how_often = how_often, delta = delta, type = type,
+                       efficacy_threshold = efficacy_threshold,
+                       futility_threshold = futility_threshold, initial = initial)
+    type_2_error = as.numeric(simsum(x)[4]/B)
+    
+    
+    if(type_2_error > desired_type_2_error)
+    {
+      #If the type 2 error is too high, we decrease the futility threshold until the type 2 error is
+      #at a more acceptable level, or until the futility threshold reaches 0.
+      while(type_2_error > desired_type_2_error & futility_threshold >= 0)
+      {
+        futility_threshold = futility_threshold - increment
+        x = simulatetrials(theta_a = theta_a, theta_b = theta_b, var_a = var_a, var_b = var_b,
+                           prior = prior, second_parameter = second_parameter, B = B,
+                           how_often = how_often, delta = delta, type = type,
+                           efficacy_threshold = efficacy_threshold,
+                           futility_threshold = futility_threshold, initial = initial)
+        type_2_error = as.numeric(simsum(x)[4]/B)
+        something_changed = T#indicate that something has changed
+      }
+    }
+    else
+    {
+      #If the type 2 error is already at an acceptable level, we check to see if we can increase the
+      #futility threshold while still maintaining an acceptable type 2 error.
+      
+      #This flag is to indicate that we successfully increased the futility threshold while maintaing
+      #an acceptable type 2 error. If we were successful, we want to loop through and check one more
+      #time. If we weren't successful, the flag will remain at F, and we will stop looping through
+      #because we found the highest futility threshold such that the type 2 error is still at an
+      #acceptable level.
+      something_changed_2 = T
+      while(type_2_error < desired_type_2_error & futility_threshold <= 1 & something_changed_2 == T)
+      {
+        something_changed_2 = F
+        #We store our results in some temporary variables.
+        potential_futility_threshold = futility_threshold + increment
+        potential_x = simulatetrials(theta_a = theta_a, theta_b = theta_b, var_a = var_a, var_b = var_b,
+                                     prior = prior, second_parameter = second_parameter, B = B,
+                                     how_often = how_often, delta = delta, type = type,
+                                     efficacy_threshold = efficacy_threshold,
+                                     futility_threshold = potential_futility_threshold, initial = initial)
+        potential_type_2_error = as.numeric(simsum(potential_x)[4]/B)
+        #This is where we check if the type 2 error is still at an acceptable level.
+        #If we so, we overwrite our regular variables with the temporary ones, and indicate that we need
+        #to loop through at least once more, for both the inner and outer while loops.
+        if(potential_type_2_error <= desired_type_2_error)
+        {
+          x = potential_x
+          futility_threshold = potential_futility_threshold
+          type_2_error = potential_type_2_error
+          something_changed   = T
+          something_changed_2 = T
+        }
+      }
+    }
+    
+    if(report)
+    {
+      #Just printing out some stuff to state what the results where after each outer loop.
+      cat("Loop ")
+      cat(loops + 1, "efficacy: ")
+      cat(efficacy_threshold, ", ")
+      cat("type 1 error: ")
+      cat(type_1_error, ", futility: ")
+      cat(futility_threshold, ", ")
+      cat("type 2 error: ")
+      cat(type_2_error, ".\n")
+    }
+    
+    loops = loops + 1
+  }
+  
+  
+  #Get final type 1 error
+  x_null = simulatetrials(theta_a = theta_a, theta_b = theta_a, var_a = var_a, var_b = var_b,
+                          prior = prior, second_parameter = second_parameter, B = B,
+                          how_often = how_often, delta = delta, type = type,
+                          efficacy_threshold = efficacy_threshold,
+                          futility_threshold = futility_threshold, initial = initial)
+  final_type_1_error = as.numeric(simsum(x_null)[3]/B)
+  
+  #Get final type 2 error
+  x_alt = simulatetrials(theta_a = theta_a, theta_b = theta_b, var_a = var_a, var_b = var_b,
+                         prior = prior, second_parameter = second_parameter, B = B,
+                         how_often = how_often, delta = delta, type = type,
+                         efficacy_threshold = efficacy_threshold,
+                         futility_threshold = futility_threshold, initial = initial)
+  final_type_2_error = as.numeric(simsum(x_alt)[4]/B)
+  
+  #Store the sumsum(x_alt) results in vector form.
+  simsum_x_alt = c(simsum(x_alt)[1,1], simsum(x_alt)[1,2], simsum(x_alt)[1,3], simsum(x_alt)[1,4],
+                   simsum(x_alt)[1,5], simsum(x_alt)[1,6], simsum(x_alt)[1,7])
+  
+  #Create data frame that will be returned.
+  values_of_interest = c(final_type_1_error, final_type_2_error, efficacy_threshold, futility_threshold,
+                         theta_a, simsum_x_alt[1], theta_b, simsum_x_alt[2:7], loops)
+  values_of_interest = as.data.frame(rbind(values_of_interest))
+  colnames(values_of_interest) = c("type_1_error", "type_2_error", "efficacy_threshold",
+                                   "futility_threshold", "placebo", "est_placebo",
+                                   "treatment", "est_treatment", "n_efficacy", "n_futility", "n_early",
+                                   "avg_patients", "mean_p", "loops")
+  return(values_of_interest)#Return data frame
+}
+
+
