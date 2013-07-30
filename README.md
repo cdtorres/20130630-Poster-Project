@@ -5,23 +5,18 @@ Simulations of clinical trials using certain Bayesian adaptive methods
 
 simulatetrials.R defines two functions:
 
-clinicaltrial() simulates a single clinical trial
+clinicaltrial() simulates a single clinical trial with adaptive randomization, as well as stopping early for futility/efficacy
 
-simulatetrials() calls clinicaltrial() multiple times, returning a data frame
+update.evaluate() updates posterior probabilities and randomization probabilities
 
-these functions require packages 'multicore' and 'pracma'
+simulatetrials() calls clinicaltrial() multiple times (which in turn calls update.evaluate() multiple times), returning a data frame
+
+the function simulatetrials() requires package 'multicore'
 
 'multicore' only runs in non-Windows environments.
 
-work.R sets the seed and calls the simulatetrials() command, while determining how long it takes to run
+work.R initializes some variables and calls the simulatetrials() function, while determining how long it takes to run
 
-additionally, it provides some summary statistics on the results
-
-
+additionally, it provides some summary statistics on the results with the function simsum()
 
 
-Some notes:
-
-simulatetrials(theta_a = .2, theta_b = .2, prior = .2, B = 500, how_often = 1) takes 25 minutes
-
-2/3 of the trials here didn't stop early
