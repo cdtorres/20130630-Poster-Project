@@ -1,6 +1,6 @@
 #indicators for if I want to simulate trials, or if I want to get thresholds
-onesim = F
-thresholds = T
+onesim = T
+thresholds = F
 
 
 if(onesim)
@@ -8,8 +8,8 @@ if(onesim)
   a = Sys.time()#to time my code
   #set.seed(619)#for the purposes of replication
   x = simulatetrials(theta_a = theta_a, theta_b = theta_b, var_a = var_a, var_b = var_b, prior = prior,
-                     second_parameter = second_parameter, B = 1000, how_often = how_often, delta = delta,
-                     type = type, efficacy_threshold = 0.57, futility_threshold = 0.01)
+                     second_parameter = second_parameter, B = B, how_often = how_often, delta = delta,
+                     type = type, efficacy_threshold = 0.4453, futility_threshold = 0.00516)
   b = Sys.time()#to time my code
   b - a#amount of time my code took to run
   

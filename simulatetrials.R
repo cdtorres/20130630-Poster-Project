@@ -244,7 +244,18 @@ update.evaluate <- function(theta_a, theta_b, var_a, var_b, delta, integral_tole
   
   #update the probability of being assigned to treatment group a (the control group)
   if(type == 'binary')
-    nv[2] = theta_a_hat/(theta_a_hat + theta_b_hat)
+  {
+    #nv[2] = theta_a_hat/(theta_a_hat + theta_b_hat)
+    r_integrand = function(y)
+    {
+      pbeta(y, nv[3], nv[4])*dbeta(y, nv[5], nv[6])
+    }
+    r_integral = integrate(r_integrand, 0, 1)$value
+    c = nv[1]/(2*N)
+    r_1 = (1 - r_integral)^c
+    r_2 = (r_integral)^c
+    nv[2] = r_1/(r_1 + r_2)
+  }
   else if(type == 'continuous')
   {
     

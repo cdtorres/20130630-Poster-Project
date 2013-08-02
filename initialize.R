@@ -1,4 +1,4 @@
-type = 'continuous'
+type = 'binary'
 ##################################################################
 # note: the Beta distribution with mean 0.5 and second parameter 1
 # is in fact the Uniform(0,1) distribution
