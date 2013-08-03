@@ -99,6 +99,11 @@ clinicaltrial <-function(seed, theta_a, theta_b, var_a, var_b, prior, second_par
     efficacious = (v[7] > efficacy_threshold)
     futile      = (v[7] < futility_threshold)
   }
+  
+  #If not efficacious, then futile
+  if(!efficacious)
+    futile = T
+  
   #Did we stop before treating all of the patients?
   stopped_early = (v[1] < N)
   
@@ -275,8 +280,8 @@ update.evaluate <- function(theta_a, theta_b, var_a, var_b, delta, integral_tole
 # This simply gives a certain kind of summary of my simulations.
 simsum <- function(x)
 {
-  est_placebo =   mean(x[,1])#average estimated placebo effect
-  est_treatment = mean(x[,2])#average estimated treatment effect
+  est_placebo =   median(x[,1])#average estimated placebo effect
+  est_treatment = median(x[,2])#average estimated treatment effect
   n_efficacy =    sum( x[,3])#number of trials that ended with perceived efficacy
   n_futility =    sum( x[,4])#number of trials that ended with perceived futility
   n_early =       sum( x[,5])#number of trials that stopped early
