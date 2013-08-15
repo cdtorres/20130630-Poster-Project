@@ -108,14 +108,73 @@ clinicaltrial <-function(seed, theta_a, theta_b, var_a, var_b, prior, second_par
   #Did we stop before treating all of the patients?
   stopped_early = (v[1] < N)
   
-  #best estimate for theta_a, given the prior and the data we obtained before stopping
-  theta_a_hat = v[3]/(v[3] + v[4])
-  #best estimate for theta_b, given the prior and the data we obtained before stopping
-  theta_b_hat = v[5]/(v[5] + v[6])
+  if(type == 'binary')
+  {
+    #best estimate for theta_a, given the prior and the data we obtained before stopping
+    theta_a_hat = v[3]/(v[3] + v[4])
+    #best estimate for theta_b, given the prior and the data we obtained before stopping
+    theta_b_hat = v[5]/(v[5] + v[6])
+    
+    #Variables of more stuff to return:
+    
+    var_placebo   = v[3]*v[4]/(((v[3] + v[4])^2)*(v[3] + v[4] + 1))
+    var_treatment = v[5]*v[6]/(((v[5] + v[6])^2)*(v[5] + v[6] + 1))
+    
+    sd_placebo =   sqrt(var_placebo)
+    sd_treatment = sqrt(var_treatment)
+    
+    median_placebo   = qbeta(0.5, v[3], v[4])
+    median_treatment = qbeta(0.5, v[5], v[6])
+    
+    placebo_0.025 = qbeta(0.025, v[3], v[4])
+    placebo_0.975 = qbeta(0.975, v[3], v[4])
+    
+    treatment_0.025 = qbeta(0.025, v[5], v[6])
+    treatment_0.975 = qbeta(0.975, v[5], v[6])
+    
+    mode_placebo   = (v[3] - 1)/(v[3] + v[4] - 2)
+    mode_treatment = (v[5] - 1)/(v[5] + v[6] - 2)
+    
+    placebo_in_CI   = as.numeric(theta_a >= placebo_0.025   & theta_a <= placebo_0.975)
+    treatment_in_CI = as.numeric(theta_b >= treatment_0.025 & theta_b <= treatment_0.975)
+  }
+  else if(type == 'continuous')
+  {
+    #best estimate for theta_a, given the prior and the data we obtained before stopping
+    theta_a_hat = v[3]
+    #best estimate for theta_b, given the prior and the data we obtained before stopping
+    theta_b_hat = v[5]
+    
+    #Variables of more stuff to return:
+    
+    var_placebo   = v[4]
+    var_treatment = v[6]
+    
+    sd_placebo =   sqrt(var_placebo)
+    sd_treatment = sqrt(var_treatment)
+    
+    median_placebo   = v[3]
+    median_treatment = v[5]
+    
+    #careful not to accidentally use variances in qnorm()!!!
+    placebo_0.025 = qnorm(0.025, v[3], sd_placebo)
+    placebo_0.975 = qnorm(0.975, v[3], sd_placebo)
+    
+    treatment_0.025 = qnorm(0.025, v[5], sd_treatment)
+    treatment_0.975 = qnorm(0.975, v[5], sd_treatment)
+    
+    mode_placebo   = v[3]
+    mode_treatment = v[5]
+    
+    placebo_in_CI   = as.numeric(theta_a >= placebo_0.025   & theta_a <= placebo_0.975)
+    treatment_in_CI = as.numeric(theta_b >= treatment_0.025 & theta_b <= treatment_0.975)
+  }
   
   #remember, v[1] is the number of patients treated
   #and v[7] is P(theta_a + delta < theta_b | data) given all the data up to the point we stopped
-  return(c(theta_a_hat, theta_b_hat, efficacious, futile, stopped_early, v[1], v[7]))
+  return(c(theta_a_hat, theta_b_hat, efficacious, futile, stopped_early, v[1], v[7], sd_placebo,
+           sd_treatment, median_placebo, median_treatment, placebo_0.025, placebo_0.975, treatment_0.025,
+           treatment_0.975, mode_placebo, mode_treatment, placebo_in_CI, treatment_in_CI))
 }
 
 
@@ -147,9 +206,12 @@ simulatetrials <- function(theta_a, theta_b, var_a = NULL, var_b = NULL, prior, 
   }
   #cat("mclapply successfully excecuted.\n")
   #format the data into something I am more comfortable with
-  x = as.data.frame(matrix(unlist(dat), ncol=7, byrow=TRUE))
+  x = as.data.frame(matrix(unlist(dat), ncol=19, byrow=TRUE))
   #cat("Data frame created.\n")
-  colnames(x) = c("placebo", "treatment", "efficacy", "futility", "early", "n", "probability")
+  colnames(x) = c("placebo", "treatment", "efficacy", "futility", "early", "n", "probability",
+                  "sd_placebo", "sd_treatment", "median_placebo", "median_treatment", "placebo_0.025",
+                  "placebo_0.975", "treatment_0.025", "treatment_0.975", "mode_placebo",
+                  "mode_treatment", "placebo_in_CI", "treatment_in_CI")
   #cat("Columns renamed.\n")
   return(x)
 }
@@ -286,8 +348,10 @@ update.evaluate <- function(theta_a, theta_b, var_a, var_b, delta, integral_tole
 }
 
 # This simply gives a certain kind of summary of my simulations.
-simsum <- function(x)
+simsum <- function(x_full)
 {
+  x = x_full[,1:7]
+  
   est_placebo =   median(x[,1])#average estimated placebo effect
   est_treatment = median(x[,2])#average estimated treatment effect
   n_efficacy =    sum( x[,3])#number of trials that ended with perceived efficacy

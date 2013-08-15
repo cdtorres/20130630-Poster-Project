@@ -1,4 +1,4 @@
-type = 'binary'
+type = 'continuous'
 ##################################################################
 # note: the Beta distribution with mean 0.5 and second parameter 1
 # is in fact the Uniform(0,1) distribution
@@ -11,7 +11,7 @@ if(type == 'continuous')
   var_b   = 1
   
   prior = 0
-  second_parameter = 0.1
+  second_parameter = 1
   delta = 1
 }
 if(type != 'continuous')
