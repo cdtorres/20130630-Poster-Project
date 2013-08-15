@@ -17,7 +17,7 @@
 # after the initial 10 patients and initial evaluation
 clinicaltrial <-function(seed, theta_a, theta_b, var_a, var_b, prior, second_parameter, N,
                          efficacy_threshold, futility_threshold, integral_tolerance, how_often, delta,
-                         type, initial)
+                         type, initial, adapt_r)
 {
   if(type == 'binary')
   {
@@ -75,10 +75,11 @@ clinicaltrial <-function(seed, theta_a, theta_b, var_a, var_b, prior, second_par
   if(initial <= N)
     v = update.evaluate(theta_a = theta_a, theta_b = theta_b, var_a = var_a, var_b = var_b, delta = delta,
                         integral_tolerance = integral_tolerance, how_many = initial, ov = v, type = type,
-                        N = N)
+                        N = N, adapt_r = adapt_r)
   else#you can't treat more than the maximum amount of patients!
     v = update.evaluate(theta_a = theta_a, theta_b = theta_b, var_a = var_a, var_b = var_b, delta = delta,
-                        integral_tolerance = integral_tolerance, how_many = N, ov = v, type = type, N = N)
+                        integral_tolerance = integral_tolerance, how_many = N, ov = v, type = type, N = N,
+                        adapt_r = adapt_r)
   
   #remember, v[7] is P(theta_a + delta < theta_b | data)
   efficacious = (v[7] > efficacy_threshold)
@@ -90,13 +91,13 @@ clinicaltrial <-function(seed, theta_a, theta_b, var_a, var_b, prior, second_par
     if(v[1] + how_often <= N)
       v = update.evaluate(theta_a = theta_a, theta_b = theta_b, var_a = var_a, var_b = var_b,
                           delta = delta, integral_tolerance = integral_tolerance, how_many = how_often,
-                          ov = v, type = type, N = N)
+                          ov = v, type = type, N = N, adapt_r = adapt_r)
     else#you can't treat more than the maximum amount of patients!
       v = update.evaluate(theta_a = theta_a, theta_b = theta_b, var_a = var_a, var_b = var_b,
                           delta = delta, integral_tolerance = integral_tolerance, how_many = (N - v[1]),
-                          ov = v, type = type, N = N)
+                          ov = v, type = type, N = N, adapt_r = adapt_r)
     
-    efficacious = (v[7] > efficacy_threshold)
+    efficacious = (v[7] >= efficacy_threshold)
     futile      = (v[7] < futility_threshold)
   }
   
@@ -123,7 +124,7 @@ clinicaltrial <-function(seed, theta_a, theta_b, var_a, var_b, prior, second_par
 simulatetrials <- function(theta_a, theta_b, var_a = NULL, var_b = NULL, prior, B, delta, type,
                            second_parameter = 5, N = 100, efficacy_threshold = 0.95,
                            futility_threshold = 0.05, integral_tolerance = 1e-5, how_often = 5, cores = 3,
-                           gseed = 619, initial = 10)
+                           gseed = 619, initial = 10, adapt_r = T)
 {
   set.seed(gseed)
   if(!(type %in% c('binary', 'continuous')))
@@ -136,13 +137,13 @@ simulatetrials <- function(theta_a, theta_b, var_a = NULL, var_b = NULL, prior, 
   {
     dat = mclapply(seeds, clinicaltrial, theta_a, theta_b, NULL, NULL, prior, second_parameter, N,
                    efficacy_threshold, futility_threshold, integral_tolerance, how_often, delta, type,
-                   initial, mc.cores = cores)
+                   initial, adapt_r, mc.cores = cores)
   }
   else if (type == 'continuous')
   {
     dat = mclapply(seeds, clinicaltrial, theta_a, theta_b, var_a, var_b, prior, second_parameter, N,
                    efficacy_threshold, futility_threshold, integral_tolerance, how_often, delta, type,
-                   initial, mc.cores = cores)
+                   initial, adapt_r, mc.cores = cores)
   }
   #cat("mclapply successfully excecuted.\n")
   #format the data into something I am more comfortable with
@@ -158,7 +159,7 @@ simulatetrials <- function(theta_a, theta_b, var_a = NULL, var_b = NULL, prior, 
 # pass in the true theta_a and theta_b, delta, integral tolerance,
 # the number of patients before next evaluation, and old values
 update.evaluate <- function(theta_a, theta_b, var_a, var_b, delta, integral_tolerance,
-                            how_many, ov, type, N)
+                            how_many, ov, type, N, adapt_r)
 {
   #require(pracma)#required for dblquad()
   nv = rep(NA, length(ov))#the updated values that will be returned by this function (new values)
@@ -248,32 +249,39 @@ update.evaluate <- function(theta_a, theta_b, var_a, var_b, delta, integral_tole
   }
   
   #update the probability of being assigned to treatment group a (the control group)
-  if(type == 'binary')
+  if(adapt_r)
   {
-    #nv[2] = theta_a_hat/(theta_a_hat + theta_b_hat)
-    r_integrand = function(y)
+    if(type == 'binary')
     {
-      pbeta(y, nv[3], nv[4])*dbeta(y, nv[5], nv[6])
+      #nv[2] = theta_a_hat/(theta_a_hat + theta_b_hat)
+      r_integrand = function(y)
+      {
+        pbeta(y, nv[3], nv[4])*dbeta(y, nv[5], nv[6])
+      }
+      r_integral = integrate(r_integrand, 0, 1)$value
+      c = nv[1]/(2*N)
+      r_1 = (1 - r_integral)^c
+      r_2 = (r_integral)^c
+      nv[2] = r_1/(r_1 + r_2)
     }
-    r_integral = integrate(r_integrand, 0, 1)$value
-    c = nv[1]/(2*N)
-    r_1 = (1 - r_integral)^c
-    r_2 = (r_integral)^c
-    nv[2] = r_1/(r_1 + r_2)
+    else if(type == 'continuous')
+    {
+      
+      #going off of page 156
+      #We're calculating P(X < Y | data) here. By defining W = X - Y and standardizing this new variable,
+      #and call it Z, we can find the probability of P(Z < r_z | data) instead, using the r_z defined below
+      r_z = (nv[5] - nv[3])/sqrt(nv[4] + nv[6])
+      r_integral = pnorm(r_z)
+      c = nv[1]/(2*N)
+      r_1 = (1 - r_integral)^c
+      r_2 = (r_integral)^c
+      nv[2] = r_1/(r_1 + r_2)
+    }
   }
-  else if(type == 'continuous')
-  {
-    
-    #going off of page 156
-    #We're calculating P(X < Y | data) here. By defining W = X - Y and standardizing this new variable,
-    #and call it Z, we can find the probability of P(Z < r_z | data) instead, using the r_z defined below
-    r_z = (nv[5] - nv[3])/sqrt(nv[4] + nv[6])
-    r_integral = pnorm(r_z)
-    c = nv[1]/(2*N)
-    r_1 = (1 - r_integral)^c
-    r_2 = (r_integral)^c
-    nv[2] = r_1/(r_1 + r_2)
-  }
+  #keep the randomization probability the same
+  else
+    nv[2] = ov[2]
+  
   return(nv)
 }
 
@@ -312,7 +320,7 @@ get.thresholds <- function(theta_a, theta_b, var_a = NULL, var_b = NULL, prior, 
                            second_parameter = 5, N = 100, efficacy_threshold = 1,
                            futility_threshold = 0, integral_tolerance = 1e-5, how_often = 5, cores = 3,
                            initial = 10, desired_type_1_error = 0.05, desired_type_2_error = 0.05,
-                           maxloops = 5, report = F)
+                           maxloops = 5, report = F, adapt_r = T)
 {
   type_1_error = 1#initial type 1 error
   type_2_error = 1#initial type 2 error
@@ -339,20 +347,20 @@ get.thresholds <- function(theta_a, theta_b, var_a = NULL, var_b = NULL, prior, 
                        prior = prior, second_parameter = second_parameter, B = B,
                        how_often = how_often, delta = delta, type = type,
                        efficacy_threshold = efficacy_threshold,
-                       futility_threshold = futility_threshold, initial = initial)
+                       futility_threshold = futility_threshold, initial = initial, adapt_r = adapt_r)
     type_1_error = as.numeric(simsum(x)[3]/B)#initial type 1 error
     if(type_1_error > desired_type_1_error)
     {
       #If the type 1 error is too high, we increase the efficacy threshold until the type 1 error is
       #low enough. But we can't let the efficacy threshold be more than 1, because that makes no sense!
-      while(type_1_error > desired_type_1_error & efficacy_threshold <= 1)
+      while(type_1_error > desired_type_1_error & efficacy_threshold + increment <= 1)
       {
         efficacy_threshold = efficacy_threshold + increment
         x = simulatetrials(theta_a = theta_a, theta_b = theta_a, var_a = var_a, var_b = var_b,
                            prior = prior, second_parameter = second_parameter, B = B,
                            how_often = how_often, delta = delta, type = type,
                            efficacy_threshold = efficacy_threshold,
-                           futility_threshold = futility_threshold, initial = initial)
+                           futility_threshold = futility_threshold, initial = initial, adapt_r = adapt_r)
         type_1_error = as.numeric(simsum(x)[3]/B)
         something_changed = T#indicate that there was a change
       }
@@ -368,7 +376,8 @@ get.thresholds <- function(theta_a, theta_b, var_a = NULL, var_b = NULL, prior, 
       #because we found the lowest efficacy threshold such that the type 1 error is still at an
       #acceptable level.
       something_changed_2 = T
-      while(type_1_error < desired_type_1_error & efficacy_threshold >= 0 & something_changed_2 == T)
+      while(type_1_error < desired_type_1_error & efficacy_threshold - increment >= 0
+            & something_changed_2 == T)
       {
         something_changed_2 = F
         
@@ -378,7 +387,8 @@ get.thresholds <- function(theta_a, theta_b, var_a = NULL, var_b = NULL, prior, 
                                      prior = prior, second_parameter = second_parameter, B = B,
                                      how_often = how_often, delta = delta, type = type,
                                      efficacy_threshold = potential_efficacy_threshold,
-                                     futility_threshold = futility_threshold, initial = initial)
+                                     futility_threshold = futility_threshold, initial = initial,
+                                     adapt_r = adapt_r)
         potential_type_1_error = as.numeric(simsum(potential_x)[3]/B)
         #This is where we check if the type 1 error is still at an acceptable level.
         #If we so, we overwrite our regular variables with the temporary ones, and indicate that we need
@@ -396,12 +406,15 @@ get.thresholds <- function(theta_a, theta_b, var_a = NULL, var_b = NULL, prior, 
     
     #Now we are going to work with the type 2 error
     #Get type 2 error, by simulating under the alternative hypothesis
+    #but first, we need to make sure that the futility threshold is no higher than the efficacy threshold!
+    if(futility_threshold > efficacy_threshold)
+      futility_threshold = efficacy_threshold
     
     x = simulatetrials(theta_a = theta_a, theta_b = theta_b, var_a = var_a, var_b = var_b,
                        prior = prior, second_parameter = second_parameter, B = B,
                        how_often = how_often, delta = delta, type = type,
                        efficacy_threshold = efficacy_threshold,
-                       futility_threshold = futility_threshold, initial = initial)
+                       futility_threshold = futility_threshold, initial = initial, adapt_r = adapt_r)
     type_2_error = as.numeric(simsum(x)[4]/B)
     
     
@@ -409,14 +422,14 @@ get.thresholds <- function(theta_a, theta_b, var_a = NULL, var_b = NULL, prior, 
     {
       #If the type 2 error is too high, we decrease the futility threshold until the type 2 error is
       #at a more acceptable level, or until the futility threshold reaches 0.
-      while(type_2_error > desired_type_2_error & futility_threshold >= 0)
+      while(type_2_error > desired_type_2_error & futility_threshold - increment >= 0)
       {
         futility_threshold = futility_threshold - increment
         x = simulatetrials(theta_a = theta_a, theta_b = theta_b, var_a = var_a, var_b = var_b,
                            prior = prior, second_parameter = second_parameter, B = B,
                            how_often = how_often, delta = delta, type = type,
                            efficacy_threshold = efficacy_threshold,
-                           futility_threshold = futility_threshold, initial = initial)
+                           futility_threshold = futility_threshold, initial = initial, adapt_r = adapt_r)
         type_2_error = as.numeric(simsum(x)[4]/B)
         something_changed = T#indicate that something has changed
       }
@@ -432,7 +445,8 @@ get.thresholds <- function(theta_a, theta_b, var_a = NULL, var_b = NULL, prior, 
       #because we found the highest futility threshold such that the type 2 error is still at an
       #acceptable level.
       something_changed_2 = T
-      while(type_2_error < desired_type_2_error & futility_threshold <= 1 & something_changed_2 == T)
+      while(type_2_error < desired_type_2_error
+            & futility_threshold + increment <= min(1, efficacy_threshold) & something_changed_2 == T)
       {
         something_changed_2 = F
         #We store our results in some temporary variables.
@@ -441,7 +455,8 @@ get.thresholds <- function(theta_a, theta_b, var_a = NULL, var_b = NULL, prior, 
                                      prior = prior, second_parameter = second_parameter, B = B,
                                      how_often = how_often, delta = delta, type = type,
                                      efficacy_threshold = efficacy_threshold,
-                                     futility_threshold = potential_futility_threshold, initial = initial)
+                                     futility_threshold = potential_futility_threshold, initial = initial,
+                                     adapt_r = adapt_r)
         potential_type_2_error = as.numeric(simsum(potential_x)[4]/B)
         #This is where we check if the type 2 error is still at an acceptable level.
         #If we so, we overwrite our regular variables with the temporary ones, and indicate that we need
@@ -483,7 +498,7 @@ get.thresholds <- function(theta_a, theta_b, var_a = NULL, var_b = NULL, prior, 
                           prior = prior, second_parameter = second_parameter, B = B,
                           how_often = how_often, delta = delta, type = type,
                           efficacy_threshold = efficacy_threshold,
-                          futility_threshold = futility_threshold, initial = initial)
+                          futility_threshold = futility_threshold, initial = initial, adapt_r = adapt_r)
   final_type_1_error = as.numeric(simsum(x_null)[3]/B)
   
   #Get final type 2 error
@@ -491,7 +506,7 @@ get.thresholds <- function(theta_a, theta_b, var_a = NULL, var_b = NULL, prior, 
                          prior = prior, second_parameter = second_parameter, B = B,
                          how_often = how_often, delta = delta, type = type,
                          efficacy_threshold = efficacy_threshold,
-                         futility_threshold = futility_threshold, initial = initial)
+                         futility_threshold = futility_threshold, initial = initial, adapt_r = adapt_r)
   final_type_2_error = as.numeric(simsum(x_alt)[4]/B)
   
   #Store the sumsum(x_alt) results in vector form.
