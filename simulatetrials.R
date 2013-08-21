@@ -348,22 +348,40 @@ update.evaluate <- function(theta_a, theta_b, var_a, var_b, delta, integral_tole
 }
 
 # This simply gives a certain kind of summary of my simulations.
-simsum <- function(x_full)
-{
-  x = x_full[,1:7]
-  
-  est_placebo =   median(x[,1])#average estimated placebo effect
-  est_treatment = median(x[,2])#average estimated treatment effect
+simsum <- function(x)
+{  
+  avg_mean_placebo =   mean(x[,1])#average estimated placebo effect
+  avg_mean_treatment = mean(x[,2])#average estimated treatment effect
   n_efficacy =    sum( x[,3])#number of trials that ended with perceived efficacy
   n_futility =    sum( x[,4])#number of trials that ended with perceived futility
   n_early =       sum( x[,5])#number of trials that stopped early
   avg_patients =  mean(x[,6])#average number of patients per trial
   mean_p =        mean(x[,7])#mean P(theta_a < theta_b | data)
+  avg_sd_placebo       = mean(x[,8])
+  avg_sd_treatment     = mean(x[,9])
+  avg_median_placebo   = mean(x[,10])
+  avg_median_treatment = mean(x[,11])
+  avg_placebo_0.025    = mean(x[,12])
+  avg_placebo_0.975    = mean(x[,13])
+  avg_treatment_0.025  = mean(x[,14])
+  avg_treatment_0.975  = mean(x[,15])
+  avg_mode_placebo     = mean(x[,16])
+  avg_mode_treatment   = mean(x[,17])
+  prop_placebo_in_CI   = mean(x[,18])
+  prop_treatment_in_CI = mean(x[,19])
   
-  thesummary = data.frame(rbind(c(est_placebo, est_treatment, n_efficacy, n_futility, n_early,
-                                  avg_patients, mean_p)))
-  colnames(thesummary) = c("est_placebo", "est_treatment", "n_efficacy", "n_futility", "n_early",
-                           "avg_patients", "mean_p")
+  thesummary = data.frame(rbind(c(avg_mean_placebo, avg_mean_treatment, n_efficacy, n_futility, n_early,
+                                  avg_patients, mean_p, avg_sd_placebo, avg_sd_treatment,
+                                  avg_median_placebo, avg_median_treatment, avg_placebo_0.025,
+                                  avg_placebo_0.975, avg_treatment_0.025, avg_treatment_0.975,
+                                  avg_mode_placebo, avg_mode_treatment, prop_placebo_in_CI,
+                                  prop_treatment_in_CI)))
+  colnames(thesummary) = c("avg_mean_placebo", "avg_mean_treatment", "n_efficacy", "n_futility",
+                           "n_early", "avg_patients", "mean_p", "avg_sd_placebo", "avg_sd_treatment",
+                           "avg_median_placebo", "avg_median_treatment", "avg_placebo_0.025",
+                           "avg_placebo_0.975", "avg_treatment_0.025", "avg_treatment_0.975",
+                           "avg_mode_placebo", "avg_mode_treatment", "prop_placebo_in_CI",
+                           "prop_treatment_in_CI")
   return(thesummary)
 }
 
